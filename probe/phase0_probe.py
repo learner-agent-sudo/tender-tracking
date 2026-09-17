@@ -761,6 +761,8 @@ def main():
     parser.add_argument("--out", default="out", help="output directory (default: ./out)")
     parser.add_argument("--no-docs", action="store_true",
                         help="skip the tender-document access probe")
+    parser.add_argument("--print-report", action="store_true",
+                        help="also write the full report to stdout (useful in CI logs)")
     args = parser.parse_args()
 
     outdir = os.path.abspath(args.out)
@@ -858,6 +860,15 @@ def main():
     report_path = os.path.join(outdir, "report.md")
     with open(report_path, "w", encoding="utf-8") as handle:
         handle.write("\n".join(report) + "\n")
+
+    if args.print_report:
+        print("=" * 68)
+        print("BEGIN REPORT")
+        print("=" * 68)
+        print("\n".join(report))
+        print("=" * 68)
+        print("END REPORT")
+        print("=" * 68)
 
     print("\n" + "=" * 68)
     print("Phase 0 probe finished.")

@@ -54,7 +54,7 @@ jobs:
           [ -n "${{ inputs.gitp_url }}"    ] && ARGS="$ARGS --gitp ${{ inputs.gitp_url }}"
           [ "${{ inputs.skip_docs }}" = "true" ] && ARGS="$ARGS --no-docs"
           echo "Running: python3 probe/phase0_probe.py --out out $ARGS"
-          python3 probe/phase0_probe.py --out out $ARGS
+          python3 probe/phase0_probe.py --out out --print-report $ARGS
 
       # The report renders on the run's Summary page, so it is readable in a
       # browser without downloading anything.
