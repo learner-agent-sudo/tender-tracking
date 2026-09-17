@@ -45,14 +45,16 @@ POLITE_DELAY = 2.0                # seconds between requests to the same host
 
 # data.gov.hk dataset landing pages. The probe reads these pages to discover the
 # actual resource file URLs, so it keeps working if those URLs change.
+# Direct file URLs where a probe run has confirmed them; dataset landing pages
+# where it has not (the probe then discovers the resource links from the page).
 DEFAULT_SOURCES = {
-    "notices": "https://data.gov.hk/en-data/dataset/hk-gld-gldetb-gldetb-tendernotice",
-    "awards": "https://data.gov.hk/en-data/dataset/hk-gld-procure4-contracts-awarded",
+    "notices": "https://pcms2.gld.gov.hk/iportal/TenderNotice.xml",
+    "awards": "https://www.gld.gov.hk/datagovhk/procurement/ContractsAwarded_EN.csv",
     "gitp": "https://data.gov.hk/en-data/dataset/hk-ogcio-ogcio_hp-list-of-gitp-providers",
 }
 
 RESOURCE_RE = re.compile(
-    r'https?://[^\s"\'<>()\\]+\.(?:xml|csv|json|txt|zip)(?:\?[^\s"\'<>()\\]*)?', re.I
+    r'https?://[^\s"\'<>()\\]+\.(?:xml|csv|json|txt|zip|xlsx|xls)(?:\?[^\s"\'<>()\\]*)?', re.I
 )
 URLISH_RE = re.compile(r'https?://[^\s"\'<>()\\]+', re.I)
 CJK_RE = re.compile(r'[\u3400-\u4dbf\u4e00-\u9fff]')
@@ -206,16 +208,32 @@ def discover_resources(page_url):
     return ordered
 
 
+GENERIC_FEED_HINTS = ("/filestore/feeds/", "data_rss", "/rss", "/feeds/")
+TOPIC_HINTS = ("tender", "contract", "award", "procure", "gitp", "supplier", "notice")
+
+
 def rank_resources(urls):
-    """Prefer English resources and real data extensions over everything else."""
+    """Order candidate resource URLs, best first.
+
+    The hazard this guards against: data.gov.hk dataset pages also link the
+    site-wide "newly published datasets" RSS feed. That feed is valid XML and
+    parses cleanly, so without an explicit demotion it can beat the actual
+    dataset file and the probe reports confident nonsense.
+    """
     def score(url):
         low = url.lower()
         points = 0
+        if any(hint in low for hint in GENERIC_FEED_HINTS):
+            points += 100          # site-wide feed, essentially never the dataset
+        if any(hint in low for hint in TOPIC_HINTS):
+            points -= 20           # the path names the subject matter
         if low.endswith((".xml", ".csv", ".json")):
             points -= 10
         if re.search(r'(^|[^a-z])(en|eng|english)([^a-z]|$)', low):
             points -= 3
-        if re.search(r'(sc|schinese|simplified)', low):
+        if re.search(r'(_tc|tchinese|traditional)', low):
+            points += 1
+        if re.search(r'(_sc|schinese|simplified)', low):
             points += 2
         return points
     return sorted(urls, key=score)
@@ -288,6 +306,23 @@ def parse_json(text):
         return [{k: ("" if v is None else str(v)) for k, v in row.items()}
                 for row in payload if isinstance(row, dict)], "json-array"
     return [], "json-unknown"
+
+
+RSS_FIELD_HINTS = {"title", "link", "description", "pubdate", "guid", "updated"}
+
+
+def looks_like_generic_feed(records, record_tag):
+    """True if these records are a syndication feed rather than domain data.
+
+    A tender feed has tender fields. If all we got is title/link/description/
+    pubDate under an <item>, we fetched a news feed by mistake.
+    """
+    if not records:
+        return False
+    if record_tag.lower() not in ("item", "entry"):
+        return False
+    keys = {k.lower().split("/")[-1] for k in records[0]}
+    return len(keys & RSS_FIELD_HINTS) >= 3 and len(keys) <= 6
 
 
 def parse_any(text, ext):
@@ -627,13 +662,15 @@ def document_probe(records, stats, outdir, limit=3):
         ctype = headers.get("Content-Type", "?")
         text_head = decode_best(raw[:8192])[0].lower()
         smells_like_login = any(hint in text_head for hint in LOGIN_HINTS)
+        body_is_html = looks_like_html(decode_best(raw[:8192])[0])
         verdict = "LOOKS LIKE A REAL DOCUMENT"
         if status != 200:
             verdict = "HTTP {} -- not retrievable anonymously".format(status)
         elif smells_like_login:
             verdict = "LOGIN/GATE PAGE -- document is behind a session"
-        elif "html" in ctype.lower():
-            verdict = "HTML page (may be a landing page, not the document itself)"
+        elif "html" in ctype.lower() or body_is_html:
+            # Content-Type is often absent or generic, so the body decides.
+            verdict = "HTML page (a landing page, not the document itself)"
         name = re.sub(r'[^A-Za-z0-9._-]', '_', url)[-80:]
         save_raw(outdir, "doc_probe_" + name, raw)
         lines.append("  - {}".format(url))
@@ -712,6 +749,11 @@ def probe_source(label, page_or_file_url, outdir, report):
             continue
         if not records:
             report.append("  ! parsed zero records from {}".format(url))
+            continue
+        if looks_like_generic_feed(records, record_tag):
+            report.append("  ! SKIPPED {}: parsed as a generic syndication feed "
+                          "(fields {}), not {} data -- trying the next candidate"
+                          .format(url, sorted(records[0])[:5], label))
             continue
 
         path = save_raw(outdir, "{}.{}".format(label, ext), raw)

@@ -76,6 +76,26 @@ print("\n".join(lines2[:14]))
 check("correctly finds the key (GLD/2026/3001 vs GLD-2026-3001)", exact2 is True)
 
 print()
+print("TEST G: the real regression -- a site-wide RSS feed must not win")
+# These are the two URLs discovery actually returned for the notices dataset.
+# The RSS feed parsed cleanly and was chosen, producing 201 rows of nonsense.
+cands = ["https://data.gov.hk/filestore/feeds/data_rss_en.xml",
+         "https://pcms2.gld.gov.hk/iportal/TenderNotice.xml"]
+ranked = p.rank_resources(cands)
+print("    ranked:", ranked)
+check("GLD tender file now ranks first",
+      ranked[0] == "https://pcms2.gld.gov.hk/iportal/TenderNotice.xml", ranked[0])
+
+rss_recs, rss_tag, _, _ = load("fixtures2/site_rss.xml", "xml")
+print("    rss record element:", rss_tag, "| fields:", sorted(rss_recs[0]))
+check("generic syndication feed is detected",
+      p.looks_like_generic_feed(rss_recs, rss_tag) is True)
+check("a real tender feed is NOT flagged as generic",
+      p.looks_like_generic_feed(recs2, "TenderNotice") is False)
+check("awards CSV is NOT flagged as generic",
+      p.looks_like_generic_feed(recs3, "csv-rows") is False)
+
+print()
 print("=" * 62)
 if fails:
     print("FAILURES:", fails)
