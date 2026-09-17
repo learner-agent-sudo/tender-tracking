@@ -456,6 +456,80 @@ def text_candidate_fields(records, stats, limit=6):
     return [key for _s, key in out[:limit]]
 
 
+def shape_signature(value):
+    """Map a value to its character shape: 'A0600622024' -> 'A9999999999'.
+
+    Two identifier spaces can be compatible even when two snapshots share no
+    values -- an open tender has not been awarded yet, so the current notices
+    and the past 12 months of awards are disjoint by construction. Comparing
+    shapes answers "could these ever join?", which value overlap cannot.
+    """
+    out = []
+    for ch in (value or "").strip()[:40]:
+        if ch.isdigit():
+            out.append("9")
+        elif ch.isalpha():
+            out.append("A")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def shape_report(a_label, a_recs, a_keys, b_label, b_recs, b_keys):
+    """Compare identifier SHAPES across sources, not just values."""
+    lines = ["### Identifier shape comparison", ""]
+    lines.append("Do the two sides use compatible identifier formats, even where")
+    lines.append("the current snapshots share no values?")
+    lines.append("")
+
+    def shapes_for(recs, key):
+        counter = Counter()
+        for rec in recs:
+            val = (rec.get(key) or "").strip()
+            if val:
+                counter[shape_signature(val)] += 1
+        return counter
+
+    a_shapes, b_shapes = {}, {}
+    for label, recs, keys, store in ((a_label, a_recs, a_keys, a_shapes),
+                                     (b_label, b_recs, b_keys, b_shapes)):
+        for key in keys:
+            counter = shapes_for(recs, key)
+            if not counter:
+                continue
+            store[key] = counter
+            lines.append("**{} `{}`** -- {} distinct shapes:".format(
+                label, key, len(counter)))
+            for shape, count in counter.most_common(4):
+                example = next((r.get(key) for r in recs
+                                if shape_signature(r.get(key, "")) == shape), "")
+                lines.append("  - `{}`  x{}  e.g. `{}`".format(shape, count, example))
+            lines.append("")
+
+    overlaps = []
+    for ak, acnt in a_shapes.items():
+        for bk, bcnt in b_shapes.items():
+            shared = set(acnt) & set(bcnt)
+            if shared:
+                rows = sum(acnt[s] for s in shared)
+                overlaps.append((rows, ak, bk, sorted(shared)[:3]))
+    overlaps.sort(reverse=True)
+    if overlaps:
+        lines.append("**Compatible formats found:**")
+        lines.append("")
+        for rows, ak, bk, shapes in overlaps[:5]:
+            lines.append("  - `{}` and `{}` share shape(s) {} ({} {} rows use it)".format(
+                ak, bk, ", ".join("`{}`".format(s) for s in shapes), rows, a_label))
+        lines.append("")
+        lines.append("A shared shape with no shared values usually means the two")
+        lines.append("datasets cover different time periods, not that the key is absent.")
+        lines.append("Accumulate daily snapshots and the join materialises over time.")
+    else:
+        lines.append("**No shape overlap.** The identifier spaces look genuinely different.")
+    lines.append("")
+    return lines
+
+
 def join_report(a_label, a_recs, a_stats, b_label, b_recs, b_stats):
     """The core question: is there a shared IDENTIFIER linking the two datasets?
 
@@ -844,6 +918,11 @@ def main():
             "awards", sources["awards"]["records"], sources["awards"]["stats"])
         report.extend(lines)
         report.append("")
+        report.extend(shape_report(
+            "notices", sources["notices"]["records"],
+            key_candidate_fields(sources["notices"]["records"], sources["notices"]["stats"]),
+            "awards", sources["awards"]["records"],
+            key_candidate_fields(sources["awards"]["records"], sources["awards"]["stats"])))
         if exact:
             report.append("**VERDICT: a shared key appears to exist.** Confirm the top pair")
             report.append("above is semantically a tender reference, then join on it directly.")
