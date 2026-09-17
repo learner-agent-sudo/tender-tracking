@@ -1,0 +1,77 @@
+name: Phase 0 probe
+
+# Run this from the GitHub web UI: Actions -> "Phase 0 probe" -> "Run workflow".
+# No local machine needed. The findings appear in the run's Summary page, and
+# the raw data it fetched is attached as a downloadable artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      notices_url:
+        description: "Override the tender-notices source (dataset page or data file URL)"
+        required: false
+        default: ""
+      awards_url:
+        description: "Override the contracts-awarded source"
+        required: false
+        default: ""
+      gitp_url:
+        description: "Override the GITP provider list source"
+        required: false
+        default: ""
+      skip_docs:
+        description: "Skip the tender-document access probe"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Offline correctness checks first. If the parsing or join logic is
+      # broken there is no point spending requests on a government server.
+      - name: Unit tests (offline)
+        working-directory: probe/tests
+        run: |
+          python3 test_logic.py
+          python3 test_hard.py
+
+      - name: Run the probe
+        id: probe
+        run: |
+          ARGS=""
+          [ -n "${{ inputs.notices_url }}" ] && ARGS="$ARGS --notices ${{ inputs.notices_url }}"
+          [ -n "${{ inputs.awards_url }}"  ] && ARGS="$ARGS --awards ${{ inputs.awards_url }}"
+          [ -n "${{ inputs.gitp_url }}"    ] && ARGS="$ARGS --gitp ${{ inputs.gitp_url }}"
+          [ "${{ inputs.skip_docs }}" = "true" ] && ARGS="$ARGS --no-docs"
+          echo "Running: python3 probe/phase0_probe.py --out out $ARGS"
+          python3 probe/phase0_probe.py --out out $ARGS
+
+      # The report renders on the run's Summary page, so it is readable in a
+      # browser without downloading anything.
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          if [ -f out/report.md ]; then
+            cat out/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No report was produced -- check the step log above." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload raw data and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0-output
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14

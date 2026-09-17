@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gld:Root xmlns:gld="http://www.gld.gov.hk/schema/tender">
+  <gld:Body>
+    <gld:TenderNotice><gld:TenderRef>GLD/2026/3001</gld:TenderRef><gld:Subject>Supply of Switches</gld:Subject><gld:Closing>2026-03-15</gld:Closing></gld:TenderNotice>
+    <gld:TenderNotice><gld:TenderRef>GLD/2026/3002</gld:TenderRef><gld:Subject>Supply of Routers</gld:Subject><gld:Closing>2026-04-15</gld:Closing></gld:TenderNotice>
+    <gld:TenderNotice><gld:TenderRef>GLD/2026/3003</gld:TenderRef><gld:Subject>Supply of Firewalls</gld:Subject><gld:Closing>2026-05-15</gld:Closing></gld:TenderNotice>
+    <gld:TenderNotice><gld:TenderRef>GLD/2026/3004</gld:TenderRef><gld:Subject>Supply of Access Points</gld:Subject><gld:Closing>2026-06-15</gld:Closing></gld:TenderNotice>
+  </gld:Body>
+</gld:Root>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TENDER_NOTICES>
+  <TENDER>
+    <TENDER_REF>GLD/2026/1234</TENDER_REF>
+    <SUBJECT>Supply of Notebook Computers</SUBJECT>
+    <SUBJECT_TC>供應手提電腦</SUBJECT_TC>
+    <REQ_DEPT>Education Bureau</REQ_DEPT>
+    <CLOSING_DATE>2026-03-15 12:00</CLOSING_DATE>
+    <DOC_URL>https://www.gld.gov.hk/doc/GLD-2026-1234.pdf</DOC_URL>
+  </TENDER>
+  <TENDER>
+    <TENDER_REF>GLD/2026/1235</TENDER_REF>
+    <SUBJECT>Supply of Network Switches</SUBJECT>
+    <SUBJECT_TC>供應網絡交換器</SUBJECT_TC>
+    <REQ_DEPT>Housing Department</REQ_DEPT>
+    <CLOSING_DATE>2026-04-02 12:00</CLOSING_DATE>
+    <DOC_URL>https://www.gld.gov.hk/doc/GLD-2026-1235.pdf</DOC_URL>
+  </TENDER>
+  <TENDER>
+    <TENDER_REF>GLD/2026/1236</TENDER_REF>
+    <SUBJECT>Provision of Cloud Storage Services</SUBJECT>
+    <SUBJECT_TC>提供雲端儲存服務</SUBJECT_TC>
+    <REQ_DEPT>Department of Health</REQ_DEPT>
+    <CLOSING_DATE>2026-04-20 12:00</CLOSING_DATE>
+    <DOC_URL>https://www.gld.gov.hk/doc/GLD-2026-1236.pdf</DOC_URL>
+  </TENDER>
+  <TENDER>
+    <TENDER_REF>GLD/2026/1237</TENDER_REF>
+    <SUBJECT>Supply of Multifunction Printers</SUBJECT>
+    <SUBJECT_TC>供應多功能打印機</SUBJECT_TC>
+    <REQ_DEPT>Inland Revenue Department</REQ_DEPT>
+    <CLOSING_DATE>2026-05-11 12:00</CLOSING_DATE>
+    <DOC_URL>https://www.gld.gov.hk/doc/GLD-2026-1237.pdf</DOC_URL>
+  </TENDER>
+  <TENDER>
+    <TENDER_REF>GLD/2026/1238</TENDER_REF>
+    <SUBJECT>Maintenance of Servers</SUBJECT>
+    <SUBJECT_TC>伺服器維護</SUBJECT_TC>
+    <REQ_DEPT>Education Bureau</REQ_DEPT>
+    <CLOSING_DATE>2026-05-30 12:00</CLOSING_DATE>
+    <DOC_URL>https://www.gld.gov.hk/doc/GLD-2026-1238.pdf</DOC_URL>
+  </TENDER>
+  <TENDER>
+    <TENDER_REF>GLD/2026/1239</TENDER_REF>
+    <SUBJECT>Supply of Tablet Devices</SUBJECT>
+    <SUBJECT_TC>供應平板電腦</SUBJECT_TC>
+    <REQ_DEPT>Social Welfare Department</REQ_DEPT>
+    <CLOSING_DATE>2026-06-14 12:00</CLOSING_DATE>
+    <DOC_URL>https://www.gld.gov.hk/doc/GLD-2026-1239.pdf</DOC_URL>
+  </TENDER>
+</TENDER_NOTICES>

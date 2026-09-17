@@ -33,6 +33,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from collections import Counter
 from xml.etree import ElementTree
 
@@ -51,7 +52,7 @@ DEFAULT_SOURCES = {
 }
 
 RESOURCE_RE = re.compile(
-    r'https?://[^\s"\'<>()\\]+\.(?:xml|csv|json|txt)(?:\?[^\s"\'<>()\\]*)?', re.I
+    r'https?://[^\s"\'<>()\\]+\.(?:xml|csv|json|txt|zip)(?:\?[^\s"\'<>()\\]*)?', re.I
 )
 URLISH_RE = re.compile(r'https?://[^\s"\'<>()\\]+', re.I)
 CJK_RE = re.compile(r'[\u3400-\u4dbf\u4e00-\u9fff]')
@@ -109,6 +110,36 @@ def decode_best(raw):
     return raw.decode("utf-8", errors="replace"), "utf-8/replace"
 
 
+def looks_like_html(text):
+    """Distinguish an HTML page from an XML data file.
+
+    Discovery can hand us a landing page instead of a data file. Without this
+    guard the CSV parser happily turns HTML into nonsense "records", which is
+    far worse than a clean failure.
+    """
+    head = text[:4000].lstrip().lower()
+    if head.startswith("<!doctype html") or head.startswith("<html"):
+        return True
+    return ("<body" in head or "<div" in head) and "<?xml" not in head
+
+
+def unpack_if_zip(raw):
+    """If raw is a zip, return the most data-looking member. HK archives are zipped."""
+    if not raw.startswith(b"PK\x03\x04"):
+        return raw, None
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            names = [n for n in archive.namelist() if not n.endswith("/")]
+            if not names:
+                return raw, "(empty zip)"
+            ranked = sorted(names, key=lambda n: (
+                0 if n.lower().endswith((".xml", ".csv", ".json")) else 1, len(n)))
+            member = ranked[0]
+            return archive.read(member), member
+    except Exception as exc:
+        return raw, "(unreadable zip: {})".format(exc)
+
+
 def save_raw(outdir, name, raw):
     path = os.path.join(outdir, "raw", name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -122,6 +153,8 @@ def guess_extension(url, headers):
     for ext in ("xml", "csv", "json"):
         if ext in ctype:
             return ext
+    if "zip" in ctype:
+        return "zip"
     path = urllib.parse.urlparse(url).path.lower()
     for ext in ("xml", "csv", "json", "pdf", "zip"):
         if path.endswith("." + ext):
@@ -258,6 +291,8 @@ def parse_json(text):
 
 
 def parse_any(text, ext):
+    if looks_like_html(text):
+        raise ValueError("content is an HTML page, not a data file")
     stripped = text.lstrip()
     if ext == "xml" or stripped.startswith("<?xml") or stripped.startswith("<"):
         try:
@@ -660,7 +695,15 @@ def probe_source(label, page_or_file_url, outdir, report):
             report.append("  ! HTTP {} for {}".format(status, url))
             continue
 
+        truncated = len(raw) >= MAX_BYTES
+        raw, zip_member = unpack_if_zip(raw)
         ext = guess_extension(url, headers)
+        if zip_member:
+            low = zip_member.lower()
+            for candidate in ("xml", "csv", "json"):
+                if low.endswith("." + candidate):
+                    ext = candidate
+                    break
         text, encoding = decode_best(raw)
         try:
             records, record_tag = parse_any(text, ext)
@@ -680,6 +723,12 @@ def probe_source(label, page_or_file_url, outdir, report):
         report.append("- Saved raw: {}".format(path))
         report.append("- Format: {} | encoding: {} | record element: {}".format(
             ext, encoding, record_tag))
+        if zip_member:
+            report.append("- Unpacked from zip archive, member: `{}`".format(zip_member))
+        if truncated:
+            report.append("- **WARNING: download hit the {} MB cap and was truncated.** "
+                          "Record count below is a floor, not the real total."
+                          .format(MAX_BYTES // (1024 * 1024)))
         report.append("- **Records: {}** | fields: {}".format(len(records), len(stats)))
         report.append("")
         report.append("| field | fill % | distinct | distinct ratio | CJK % | sample |")
